@@ -27,6 +27,14 @@ class _AlarmListPageState extends State<AlarmListPage> {
           return ListTile(
             title: Text('Alarm at ${alarm.time.format(context)}'),
             subtitle: Text('Tone: ${alarm.tone}'),
+            trailing: Switch(
+              value: alarm.isActive,  // isActive 필드 사용
+              onChanged: (value) {
+                setState(() {
+                  alarm.isActive = value;  // 스위치 상태 업데이트
+                });
+              },
+            ),
           );
         },
       ),

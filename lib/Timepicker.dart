@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'AlarmInfo.dart';
-import 'main.dart';  // main.dart 파일에서 flutterLocalNotificationsPlugin 객체를 가져오기 위해
+import 'main.dart';
 
 class AlarmSettingPage extends StatefulWidget {
   @override
@@ -11,7 +11,8 @@ class AlarmSettingPage extends StatefulWidget {
 class _AlarmSettingPageState extends State<AlarmSettingPage> {
   TimeOfDay selectedTime = TimeOfDay.now();
   String selectedTone = 'ala_1';
-  int alarmID = 0;  // 알람 ID를 저장하는 변수 추가
+  List<bool> isSelected = [false, false, false, false, false, false, false];
+  int alarmID = 0;
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
@@ -28,10 +29,12 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
     final DateTime now = DateTime.now();
     final DateTime scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute);
 
+    String channelId = 'alarm_channel_${DateTime.now().millisecondsSinceEpoch}'; // Unique channel ID
+
     var androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'alarm_id',
-      'alarm_name',
-      'alarm_description',
+      channelId,
+      'Alarm channel',
+      'Channel for Alarm notification',
       importance: Importance.max,
       priority: Priority.high,
       sound: RawResourceAndroidNotificationSound(selectedTone),
@@ -42,14 +45,14 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
     );
 
     await flutterLocalNotificationsPlugin.schedule(
-      alarmID,  // 고유 ID 사용
+      alarmID,
       'Alarm',
       tone,
       scheduledDate,
       platformChannelSpecifics,
     );
 
-    alarmID++;  // 알람을 설정할 때마다 ID 증가
+    alarmID++;
   }
 
   @override
@@ -58,48 +61,67 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
       appBar: AppBar(
         title: Text('Alarm Setting'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: () => _selectTime(context),
-              child: Text('Select time: ${selectedTime.format(context)}'),
-            ),
-            DropdownButton<String>(
-              value: selectedTone,
-              items: <String>['ala_1', 'ala_2', 'ala_3']
-                  .map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  selectedTone = newValue!;
-                });
-              },
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await _scheduleAlarm(selectedTime, selectedTone);
-                AlarmInfo newAlarm = AlarmInfo(
-                  time: selectedTime,
-                  tone: selectedTone,
-                );
-                Navigator.pop(context, newAlarm);
-              },
-              child: Text('Save'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('Cancel'),
-            ),
-          ],
+      body: SingleChildScrollView(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              ElevatedButton(
+                onPressed: () => _selectTime(context),
+                child: Text('Select time: ${selectedTime.format(context)}'),
+              ),
+              DropdownButton<String>(
+                value: selectedTone,
+                items: <String>['ala_1', 'ala_2', 'ala_3']
+                    .map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    selectedTone = newValue!;
+                  });
+                },
+              ),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: isSelected.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return CheckboxListTile(
+                    title: Text(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]),
+                    value: isSelected[index],
+                    onChanged: (bool? value) {
+                      setState(() {
+                        isSelected[index] = value!;
+                      });
+                    },
+                  );
+                },
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  await _scheduleAlarm(selectedTime, selectedTone);
+                  AlarmInfo newAlarm = AlarmInfo(
+                    time: selectedTime,
+                    tone: selectedTone,
+                    repeatDays: isSelected,
+                  );
+                  Navigator.pop(context, newAlarm);
+                },
+                child: Text('Save'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
         ),
       ),
     );
