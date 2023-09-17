@@ -72,6 +72,7 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
 
           print("Current time: $now");
           print("Scheduled Date: $scheduledDate");
+          print('Scheduling alarm with tone: $tone');
 
           if (scheduledDate.isAfter(now) || scheduledDate.isAtSameMomentAs(now)) {
             adjustedSchedule = scheduledDate;
@@ -106,6 +107,7 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
           );
           print("Alarm with ID $alarmID scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
           print("Alarm scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
+          print('Alarm scheduled with tone: $tone');  // 추가할 로그
 
           alarmID++;
         }
@@ -164,15 +166,16 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
                 },
               ),
               ElevatedButton(
-                onPressed: () async {
+                onPressed: isSelected.contains(true) ? () async {
                   await _scheduleAlarm(selectedTime, selectedTone, isSelected);
                   AlarmInfo newAlarm = AlarmInfo(
                     time: selectedTime,
                     tone: selectedTone,
                     repeatDays: isSelected,
+                    id : alarmID,
                   );
                   Navigator.pop(context, newAlarm);
-                },
+                } : null,  // 요일이 하나도 선택되지 않았다면 null
                 child: Text('Save'),
               ),
               ElevatedButton(
