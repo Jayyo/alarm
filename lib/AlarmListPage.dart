@@ -28,13 +28,28 @@ class _AlarmListPageState extends State<AlarmListPage> {
             title: Text('Alarm at ${alarm.time.format(context)}'),
             subtitle: Text('Tone: ${alarm.tone}'),
             trailing: Switch(
-              value: alarm.isActive,  // isActive 필드 사용
+              value: alarm.isActive, // isActive 필드 사용
               onChanged: (value) {
                 setState(() {
-                  alarm.isActive = value;  // 스위치 상태 업데이트
+                  alarm.isActive = value; // 스위치 상태 업데이트
                 });
               },
             ),
+            onTap: () async {
+              final updatedAlarm = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AlarmSettingPage(
+                    existingAlarm: alarm, // 기존 알람 정보 전달
+                  ),
+                ),
+              ) as AlarmInfo?;
+              if (updatedAlarm != null) {
+                setState(() {
+                  alarms[index] = updatedAlarm; // 알람 정보 업데이트
+                });
+              }
+            },
           );
         },
       ),

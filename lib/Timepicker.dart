@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'AlarmInfo.dart';
 import 'main.dart';
+import 'package:timezone/timezone.dart' as tz;
+
 
 class AlarmSettingPage extends StatefulWidget {
+  final AlarmInfo? existingAlarm;  // 기존 알람 정보를 받을 변수 추가
+
+  AlarmSettingPage({this.existingAlarm});
   @override
   _AlarmSettingPageState createState() => _AlarmSettingPageState();
 }
@@ -13,6 +18,20 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
   String selectedTone = 'ala_1';
   List<bool> isSelected = [false, false, false, false, false, false, false];
   int alarmID = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingAlarm != null) {  // 기존 알람이 있다면 초기 값을 설정
+      selectedTime = widget.existingAlarm!.time;
+      selectedTone = widget.existingAlarm!.tone;
+      isSelected = widget.existingAlarm!.repeatDays;
+    } else {
+      selectedTime = TimeOfDay.now();
+      selectedTone = 'ala_1';
+      isSelected = [false, false, false, false, false, false, false];
+    }
+  }
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
@@ -25,35 +44,77 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
       });
   }
 
-  Future<void> _scheduleAlarm(TimeOfDay time, String tone) async {
-    final DateTime now = DateTime.now();
-    final DateTime scheduledDate = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+  Future<void> _scheduleAlarm(TimeOfDay time, String tone, List<bool> repeatDays) async {
+    try {
+      final DateTime now = DateTime.now();
+      print("Current time: $now");
+      int todayWeekday = now.weekday -1;
+      print("Today's weekday index : $todayWeekday");
 
-    String channelId = 'alarm_channel_${DateTime.now().millisecondsSinceEpoch}'; // Unique channel ID
+      for (int i = 0; i < repeatDays.length; i++) {
+        print("Checking repeatDay index : $i, value : ${repeatDays[i]}");
+        if (repeatDays[i]) {
+          int daysToAdd = (i - todayWeekday + 7) % 7;
+          print("daysToAdd: $daysToAdd");
 
-    var androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      channelId,
-      'Alarm channel',
-      'Channel for Alarm notification',
-      importance: Importance.max,
-      priority: Priority.high,
-      sound: RawResourceAndroidNotificationSound(selectedTone),
-    );
+          final DateTime scheduledDate = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
 
-    var platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-    );
+          if (daysToAdd == 0 && scheduledDate.isBefore(now)) {
+            if (scheduledDate.isBefore(now)) {
+              daysToAdd = 7;
+            }
+          }
 
-    await flutterLocalNotificationsPlugin.schedule(
-      alarmID,
-      'Alarm',
-      tone,
-      scheduledDate,
-      platformChannelSpecifics,
-    );
+          final DateTime newScheduledDate = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
+          print('Days to add for index $i: $daysToAdd');
 
-    alarmID++;
+          DateTime adjustedSchedule = scheduledDate;
+
+          print("Current time: $now");
+          print("Scheduled Date: $scheduledDate");
+
+          if (scheduledDate.isAfter(now) || scheduledDate.isAtSameMomentAs(now)) {
+            adjustedSchedule = scheduledDate;
+          } else {
+            adjustedSchedule = scheduledDate.add(Duration(days: 7));
+          }
+
+          String channelId = 'alarm_channel_${DateTime.now().millisecondsSinceEpoch}'; // Unique channel ID
+
+          var androidPlatformChannelSpecifics = AndroidNotificationDetails(
+            channelId,
+            'Alarm channel',
+            'Channel for Alarm notification',
+            importance: Importance.max,
+            priority: Priority.high,
+            sound: RawResourceAndroidNotificationSound(selectedTone),
+          );
+
+          var platformChannelSpecifics = NotificationDetails(
+            android: androidPlatformChannelSpecifics,
+          );
+
+          await flutterLocalNotificationsPlugin.zonedSchedule(
+            alarmID,
+            'Alarm',
+            tone,
+            tz.TZDateTime.from(adjustedSchedule, tz.local),  // UTC 대신 local 사용
+            platformChannelSpecifics,
+            uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+            androidAllowWhileIdle: true,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,  // 매주 같은 요일에 알람이 울림
+          );
+          print("Alarm with ID $alarmID scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
+          print("Alarm scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
+
+          alarmID++;
+        }
+      }
+    } catch (e) {
+      print("Error while scheduling alarm: $e");
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +165,7 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  await _scheduleAlarm(selectedTime, selectedTone);
+                  await _scheduleAlarm(selectedTime, selectedTone, isSelected);
                   AlarmInfo newAlarm = AlarmInfo(
                     time: selectedTime,
                     tone: selectedTone,
