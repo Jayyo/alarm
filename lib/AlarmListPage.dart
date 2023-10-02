@@ -47,10 +47,16 @@ class _AlarmListPageState extends State<AlarmListPage> {
             ),
 
             trailing: Switch(
-              value: alarm.isActive, // isActive 필드 사용
-              onChanged: (value) {
+              value: alarm.isActive,
+              onChanged: (value) async {
+                if (value) {
+                  await scheduleAlarm(context, alarm.id, alarm.time, alarm.tone, alarm.repeatDays);
+
+                } else {
+                  flutterLocalNotificationsPlugin.cancel(alarm.id);
+                }
                 setState(() {
-                  alarm.isActive = value; // 스위치 상태 업데이트
+                  alarm.isActive = value;
                 });
               },
             ),

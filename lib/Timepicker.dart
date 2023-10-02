@@ -4,6 +4,101 @@ import 'AlarmInfo.dart';
 import 'main.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+Future<void> scheduleAlarm(BuildContext context, int alarmID, TimeOfDay time, String tone, List<bool> repeatDays) async {
+  try {
+    final DateTime now = DateTime.now().subtract(Duration(seconds: DateTime.now().second, milliseconds: DateTime.now().millisecond));
+    print("Current time: $now");
+    int todayWeekday = now.weekday -1;
+    print("Today's weekday index : $todayWeekday");
+
+    // Calculate the nearest alarm time and display it at the bottom
+    Duration shortestDuration = Duration(days: 7); // Initialize to a large value
+    for(int i = 0; i < repeatDays.length; i++) {
+      if (repeatDays[i]) {
+        int daysToAdd = (i - todayWeekday + 7) % 7;
+        DateTime nextAlarm = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
+        if (nextAlarm.isBefore(now)) {
+          nextAlarm = nextAlarm.add(Duration(days: 7));
+        }
+        Duration timeToNextAlarm = Duration(milliseconds: nextAlarm.millisecondsSinceEpoch - now.millisecondsSinceEpoch);
+        if (timeToNextAlarm < shortestDuration) {
+          shortestDuration = timeToNextAlarm;
+        }
+      }
+    }
+    int hours = shortestDuration.inHours;
+    int minutes = shortestDuration.inMinutes.remainder(60);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('$hours시간 $minutes분 뒤에 알람이 울립니다'),
+      duration: Duration(seconds: 3),
+    ));
+
+    for (int i = 0; i < repeatDays.length; i++) {
+      print("Checking repeatDay index : $i, value : ${repeatDays[i]}");
+      if (repeatDays[i]) {
+        int daysToAdd = (i - todayWeekday + 7) % 7;
+        print("daysToAdd: $daysToAdd");
+
+        final DateTime scheduledDate = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
+
+        if (daysToAdd == 0 && scheduledDate.isBefore(now)) {
+          if (scheduledDate.isBefore(now)) {
+            daysToAdd = 7;
+
+          }
+        }
+
+        final DateTime newScheduledDate = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
+        print('Days to add for index $i: $daysToAdd');
+
+        DateTime adjustedSchedule = scheduledDate;
+
+        print("Current time: $now");
+        print("Scheduled Date: $scheduledDate");
+        print('Scheduling alarm with tone: $tone');
+
+        if (scheduledDate.isAfter(now) || scheduledDate.isAtSameMomentAs(now)) {
+          adjustedSchedule = scheduledDate;
+        } else {
+          adjustedSchedule = scheduledDate.add(Duration(days: 7));
+        }
+
+        String channelId = 'alarm_channel_${DateTime.now().millisecondsSinceEpoch}'; // Unique channel ID
+
+        var androidPlatformChannelSpecifics = AndroidNotificationDetails(
+          channelId,
+          'Alarm channel',
+          'Channel for Alarm notification',
+          importance: Importance.max,
+          priority: Priority.high,
+          sound: RawResourceAndroidNotificationSound(tone),
+        );
+
+        var platformChannelSpecifics = NotificationDetails(
+          android: androidPlatformChannelSpecifics,
+        );
+
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          alarmID,
+          'Alarm',
+          tone,
+          tz.TZDateTime.from(adjustedSchedule, tz.local),  // UTC 대신 local 사용
+          platformChannelSpecifics,
+          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          androidAllowWhileIdle: true,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,  // 매주 같은 요일에 알람이 울림
+        );
+        print("Alarm with ID $alarmID scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
+        print("Alarm scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
+        print('Alarm scheduled with tone: $tone');  // 추가할 로그
+
+        alarmID++;
+      }
+    }
+  } catch (e) {
+    print("Error while scheduling alarm: $e");
+  }
+}
 
 class AlarmSettingPage extends StatefulWidget {
   final AlarmInfo? existingAlarm;  // 기존 알람 정보를 받을 변수 추가
@@ -42,102 +137,6 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
       setState(() {
         selectedTime = picked;
       });
-  }
-
-  Future<void> _scheduleAlarm(TimeOfDay time, String tone, List<bool> repeatDays) async {
-    try {
-      final DateTime now = DateTime.now().subtract(Duration(seconds: DateTime.now().second, milliseconds: DateTime.now().millisecond));
-      print("Current time: $now");
-      int todayWeekday = now.weekday -1;
-      print("Today's weekday index : $todayWeekday");
-
-      // Calculate the nearest alarm time and display it at the bottom
-      Duration shortestDuration = Duration(days: 7); // Initialize to a large value
-      for(int i = 0; i < repeatDays.length; i++) {
-        if (repeatDays[i]) {
-          int daysToAdd = (i - todayWeekday + 7) % 7;
-          DateTime nextAlarm = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
-          if (nextAlarm.isBefore(now)) {
-            nextAlarm = nextAlarm.add(Duration(days: 7));
-          }
-          Duration timeToNextAlarm = Duration(milliseconds: nextAlarm.millisecondsSinceEpoch - now.millisecondsSinceEpoch);
-          if (timeToNextAlarm < shortestDuration) {
-            shortestDuration = timeToNextAlarm;
-          }
-        }
-      }
-      int hours = shortestDuration.inHours;
-      int minutes = shortestDuration.inMinutes.remainder(60);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('$hours시간 $minutes분 뒤에 알람이 울립니다'),
-        duration: Duration(seconds: 3),
-      ));
-
-      for (int i = 0; i < repeatDays.length; i++) {
-        print("Checking repeatDay index : $i, value : ${repeatDays[i]}");
-        if (repeatDays[i]) {
-          int daysToAdd = (i - todayWeekday + 7) % 7;
-          print("daysToAdd: $daysToAdd");
-
-          final DateTime scheduledDate = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
-
-          if (daysToAdd == 0 && scheduledDate.isBefore(now)) {
-            if (scheduledDate.isBefore(now)) {
-              daysToAdd = 7;
-
-            }
-          }
-
-          final DateTime newScheduledDate = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
-          print('Days to add for index $i: $daysToAdd');
-
-          DateTime adjustedSchedule = scheduledDate;
-
-          print("Current time: $now");
-          print("Scheduled Date: $scheduledDate");
-          print('Scheduling alarm with tone: $tone');
-
-          if (scheduledDate.isAfter(now) || scheduledDate.isAtSameMomentAs(now)) {
-            adjustedSchedule = scheduledDate;
-          } else {
-            adjustedSchedule = scheduledDate.add(Duration(days: 7));
-          }
-
-          String channelId = 'alarm_channel_${DateTime.now().millisecondsSinceEpoch}'; // Unique channel ID
-
-          var androidPlatformChannelSpecifics = AndroidNotificationDetails(
-            channelId,
-            'Alarm channel',
-            'Channel for Alarm notification',
-            importance: Importance.max,
-            priority: Priority.high,
-            sound: RawResourceAndroidNotificationSound(selectedTone),
-          );
-
-          var platformChannelSpecifics = NotificationDetails(
-            android: androidPlatformChannelSpecifics,
-          );
-
-          await flutterLocalNotificationsPlugin.zonedSchedule(
-            alarmID,
-            'Alarm',
-            tone,
-            tz.TZDateTime.from(adjustedSchedule, tz.local),  // UTC 대신 local 사용
-            platformChannelSpecifics,
-            uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-            androidAllowWhileIdle: true,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,  // 매주 같은 요일에 알람이 울림
-          );
-          print("Alarm with ID $alarmID scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
-          print("Alarm scheduled for ${tz.TZDateTime.from(adjustedSchedule, tz.local)}");  // Debug log
-          print('Alarm scheduled with tone: $tone');  // 추가할 로그
-
-          alarmID++;
-        }
-      }
-    } catch (e) {
-      print("Error while scheduling alarm: $e");
-    }
   }
 
 
@@ -190,7 +189,7 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
               ),
               ElevatedButton(
                 onPressed: isSelected.contains(true) ? () async {
-                  await _scheduleAlarm(selectedTime, selectedTone, isSelected);
+                  await scheduleAlarm(context, alarmID, selectedTime, selectedTone, isSelected);
                   AlarmInfo newAlarm = AlarmInfo(
                     time: selectedTime,
                     tone: selectedTone,
