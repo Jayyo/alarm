@@ -46,10 +46,32 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
 
   Future<void> _scheduleAlarm(TimeOfDay time, String tone, List<bool> repeatDays) async {
     try {
-      final DateTime now = DateTime.now();
+      final DateTime now = DateTime.now().subtract(Duration(seconds: DateTime.now().second, milliseconds: DateTime.now().millisecond));
       print("Current time: $now");
       int todayWeekday = now.weekday -1;
       print("Today's weekday index : $todayWeekday");
+
+      // Calculate the nearest alarm time and display it at the bottom
+      Duration shortestDuration = Duration(days: 7); // Initialize to a large value
+      for(int i = 0; i < repeatDays.length; i++) {
+        if (repeatDays[i]) {
+          int daysToAdd = (i - todayWeekday + 7) % 7;
+          DateTime nextAlarm = DateTime(now.year, now.month, now.day + daysToAdd, time.hour, time.minute);
+          if (nextAlarm.isBefore(now)) {
+            nextAlarm = nextAlarm.add(Duration(days: 7));
+          }
+          Duration timeToNextAlarm = Duration(milliseconds: nextAlarm.millisecondsSinceEpoch - now.millisecondsSinceEpoch);
+          if (timeToNextAlarm < shortestDuration) {
+            shortestDuration = timeToNextAlarm;
+          }
+        }
+      }
+      int hours = shortestDuration.inHours;
+      int minutes = shortestDuration.inMinutes.remainder(60);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$hours시간 $minutes분 뒤에 알람이 울립니다'),
+        duration: Duration(seconds: 3),
+      ));
 
       for (int i = 0; i < repeatDays.length; i++) {
         print("Checking repeatDay index : $i, value : ${repeatDays[i]}");
@@ -62,6 +84,7 @@ class _AlarmSettingPageState extends State<AlarmSettingPage> {
           if (daysToAdd == 0 && scheduledDate.isBefore(now)) {
             if (scheduledDate.isBefore(now)) {
               daysToAdd = 7;
+
             }
           }
 
